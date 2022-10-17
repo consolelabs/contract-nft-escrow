@@ -33,6 +33,8 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
+import "hardhat/console.sol";
+
 contract MochiNFTEscrow is IERC721Receiver, Pausable, Ownable, ReentrancyGuard {
     struct TradeItem {
         uint256 tradeId;
@@ -99,7 +101,7 @@ contract MochiNFTEscrow is IERC721Receiver, Pausable, Ownable, ReentrancyGuard {
 
     function createTradeOffer(address to) external notContract whenNotPaused {
         trades.push(TradeOffer(msg.sender, to, false, false, false));
-        uint256 tradeId = trades.length;
+        uint256 tradeId = trades.length - 1;
         userTrades[msg.sender].push(tradeId);
         userTrades[to].push(tradeId);
         emit TradeCreated(tradeId, msg.sender, to);
@@ -149,6 +151,7 @@ contract MochiNFTEscrow is IERC721Receiver, Pausable, Ownable, ReentrancyGuard {
         uint256[] memory fromItemIds = userTradingItems[tradeId][trade.from];
         for (uint256 i = 0; i < fromItemIds.length; i++) {
             TradeItem memory item = tradeItems[fromItemIds[i]];
+            IERC721(item.tokenAddress).approve(msg.sender, item.tokenId);
             IERC721(item.tokenAddress).safeTransferFrom(
                 address(this),
                 trade.to,
@@ -156,9 +159,10 @@ contract MochiNFTEscrow is IERC721Receiver, Pausable, Ownable, ReentrancyGuard {
             );
         }
         // Send 'to' items to 'from' address
-        uint256[] memory toItemIds = userTradingItems[tradeId][trade.from];
+        uint256[] memory toItemIds = userTradingItems[tradeId][trade.to];
         for (uint256 i = 0; i < toItemIds.length; i++) {
-            TradeItem memory item = tradeItems[fromItemIds[i]];
+            TradeItem memory item = tradeItems[toItemIds[i]];
+            IERC721(item.tokenAddress).approve(msg.sender, item.tokenId);
             IERC721(item.tokenAddress).safeTransferFrom(
                 address(this),
                 trade.from,
@@ -240,11 +244,10 @@ contract MochiNFTEscrow is IERC721Receiver, Pausable, Ownable, ReentrancyGuard {
             msg.sender
         ];
         for (uint256 i = 0; i < userTradingItemIds.length; i++) {
-            TradeItem storage item = tradeItems[i];
+            TradeItem storage item = tradeItems[userTradingItemIds[i]];
             if (!item.exists) continue;
             if (item.tokenAddress != tokenAddress) continue;
             if (!_contain(tokenIds, item.tokenId)) continue;
-            IERC721(item.tokenAddress).approve(msg.sender, item.tokenId);
             IERC721(item.tokenAddress).safeTransferFrom(
                 address(this),
                 msg.sender,
@@ -293,7 +296,7 @@ contract MochiNFTEscrow is IERC721Receiver, Pausable, Ownable, ReentrancyGuard {
         uint256[] memory itemIds = userTradingItems[tradeId][user];
         TradeItem[] memory items = new TradeItem[](itemIds.length);
         for (uint256 i = 0; i < itemIds.length; i++) {
-            TradeItem memory tradeItem = tradeItems[i];
+            TradeItem memory tradeItem = tradeItems[itemIds[i]];
             items[i] = tradeItem;
         }
         return items;
@@ -335,9 +338,8 @@ contract MochiNFTEscrow is IERC721Receiver, Pausable, Ownable, ReentrancyGuard {
     function _withdrawAll(uint256 tradeId, address to) internal {
         uint256[] memory userTradingItemIds = userTradingItems[tradeId][to];
         for (uint256 i = 0; i < userTradingItemIds.length; i++) {
-            TradeItem memory item = tradeItems[i];
+            TradeItem memory item = tradeItems[userTradingItemIds[i]];
             if (!item.exists) continue;
-            IERC721(item.tokenAddress).approve(msg.sender, item.tokenId);
             IERC721(item.tokenAddress).safeTransferFrom(
                 address(this),
                 to,

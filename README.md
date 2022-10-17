@@ -2,9 +2,9 @@
 
 ## Contracts
 
-| Name                  | Goerli address                                                                                                                |
-|-----------------------|--------------------------------------------------------------------------------------------------------------------------------|
-| MochiNFTEscrow        | [0x270E4c4a3952E6d231Db85Db1930BD95b4fc50e8](https://goerli.etherscan.io/address/0x270E4c4a3952E6d231Db85Db1930BD95b4fc50e8)  |
+| Name           | Goerli address                                                                                                               |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| MochiNFTEscrow | [0xeB5CD31F7e1667832C4cD46a348a724ED10AE296](https://goerli.etherscan.io/address/0xeB5CD31F7e1667832C4cD46a348a724ED10AE296) |
 
 ## How to run project
 
@@ -14,17 +14,23 @@
 4. Deploy contracts with `npx hardhat run scripts/deploy.ts`
 
 ## Note
+
 - Still in experiment. DYOR!
 
 ## Todo list
 
 ### Feature
+
 - [x] Create trade offer
-- [x] Cancel offer 
+- [x] Cancel offer
 - [x] Deposit
 - [x] Withdraw
 - [x] Lock
 - [x] Unlock
 
 ### Test
+
 - [x] Deploy
+- [x] Swap
+- [x] Withdraw
+- [x] Cancel
