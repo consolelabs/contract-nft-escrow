@@ -4,7 +4,7 @@
 
 | Name           | Goerli address                                                                                                               |
 | -------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| MochiNFTEscrow | [0x81F17c08De533Aa44e7C8Fe32F6f444D3CC65EeD](https://goerli.etherscan.io/address/0x81F17c08De533Aa44e7C8Fe32F6f444D3CC65EeD) |
+| MochiNFTEscrow | [0x8D3bb21997f383B3b6aEcE555F87F8D5D5a0587b](https://goerli.etherscan.io/address/0x8D3bb21997f383B3b6aEcE555F87F8D5D5a0587b) |
 
 ## How to run project
 
