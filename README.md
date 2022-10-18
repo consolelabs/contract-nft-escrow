@@ -4,7 +4,7 @@
 
 | Name           | Goerli address                                                                                                               |
 | -------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| MochiNFTEscrow | [0xeB5CD31F7e1667832C4cD46a348a724ED10AE296](https://goerli.etherscan.io/address/0xeB5CD31F7e1667832C4cD46a348a724ED10AE296) |
+| MochiNFTEscrow | [0x81F17c08De533Aa44e7C8Fe32F6f444D3CC65EeD](https://goerli.etherscan.io/address/0x81F17c08De533Aa44e7C8Fe32F6f444D3CC65EeD) |
 
 ## How to run project
 
@@ -27,6 +27,8 @@
 - [x] Withdraw
 - [x] Lock
 - [x] Unlock
+- [x] Get user trades
+- [x] Get user deposited items
 
 ### Test
 
@@ -34,3 +36,5 @@
 - [x] Swap
 - [x] Withdraw
 - [x] Cancel
+- [x] Get user trades
+- [x] Get user deposited items

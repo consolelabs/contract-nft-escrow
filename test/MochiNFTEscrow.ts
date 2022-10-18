@@ -90,8 +90,41 @@ describe("MochiNFTEscrow", function () {
 
         await escrow.lockTrade(tradeId);
         await escrow.connect(otherAccount).lockTrade(tradeId);
-        expect(await nft.ownerOf("4")).to.equal(owner.address);
+        for (const tokenId of otherTokenIds) {
+          expect(await nft.ownerOf(tokenId)).to.equal(owner.address);
+        }
+
+        for (const tokenId of ownerTokenIds) {
+          expect(await nft.ownerOf(tokenId)).to.equal(otherAccount.address);
+        }
       });
+    });
+  });
+
+  describe("Unlock", function () {
+    it("Should change state from lock to unlock", async function () {
+      const { escrow, owner, otherAccount, nft, ownerTokenIds, otherTokenIds } =
+        await loadFixture(deployEscrowFixtureWithNFT);
+      const tradeId = 0;
+      await escrow.createTradeOffer(otherAccount.address);
+
+      for (const tokenId of ownerTokenIds) {
+        await nft.approve(escrow.address, tokenId);
+      }
+      await escrow.deposit(tradeId, nft.address, ownerTokenIds);
+
+      for (const tokenId of otherTokenIds) {
+        await nft.connect(otherAccount).approve(escrow.address, tokenId);
+      }
+      await escrow
+        .connect(otherAccount)
+        .deposit(tradeId, nft.address, otherTokenIds);
+
+      await escrow.lockTrade(tradeId);
+      expect((await escrow.trades(tradeId)).isFromLocked).be.true;
+
+      await escrow.unlockTrade(tradeId);
+      expect((await escrow.trades(tradeId)).isFromLocked).be.false;
     });
   });
 
@@ -160,6 +193,61 @@ describe("MochiNFTEscrow", function () {
         );
         expect((await escrow.trades(tradeId)).isClosed).be.true;
       });
+    });
+  });
+
+  describe("Get deposited items", function () {
+    it("Should return deposited item of user", async function () {
+      const { escrow, owner, otherAccount, nft, ownerTokenIds, otherTokenIds } =
+        await loadFixture(deployEscrowFixtureWithNFT);
+      const tradeId = 0;
+      await escrow.createTradeOffer(otherAccount.address);
+
+      for (const tokenId of ownerTokenIds) {
+        await nft.approve(escrow.address, tokenId);
+      }
+      await escrow.deposit(tradeId, nft.address, ownerTokenIds);
+
+      for (const tokenId of otherTokenIds) {
+        await nft.connect(otherAccount).approve(escrow.address, tokenId);
+      }
+      await escrow
+        .connect(otherAccount)
+        .deposit(tradeId, nft.address, otherTokenIds);
+
+      const fromItems = await escrow.depositedItems(tradeId, owner.address);
+      expect(fromItems.length).to.equal(ownerTokenIds.length);
+      const toItems = await escrow.depositedItems(
+        tradeId,
+        otherAccount.address
+      );
+      expect(toItems.length).to.equal(otherTokenIds.length);
+    });
+  });
+
+  describe("Get trade offers", function () {
+    it("Should return trade offers of user", async function () {
+      const { escrow, owner, otherAccount, nft, ownerTokenIds, otherTokenIds } =
+        await loadFixture(deployEscrowFixtureWithNFT);
+      const tradeOfferCount = 2;
+      for (let i = 0; i < tradeOfferCount; i++) {
+        await escrow.createTradeOffer(otherAccount.address);
+      }
+      const trades = await escrow.tradesOf(owner.address);
+      expect(trades.length).to.equal(tradeOfferCount);
+    });
+  });
+
+  describe("Get trade offer ids", function () {
+    it("Should return trade offer ids of user", async function () {
+      const { escrow, owner, otherAccount, nft, ownerTokenIds, otherTokenIds } =
+        await loadFixture(deployEscrowFixtureWithNFT);
+      const tradeOfferCount = 2;
+      for (let i = 0; i < tradeOfferCount; i++) {
+        await escrow.createTradeOffer(otherAccount.address);
+      }
+      const tradeIds = await escrow.tradeIds(owner.address);
+      expect(tradeIds.length).to.equal(tradeOfferCount);
     });
   });
 });

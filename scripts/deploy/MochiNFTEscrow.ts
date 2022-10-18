@@ -16,8 +16,8 @@ async function main() {
     .then(() => {
       console.log(`contract verified success`);
     })
-    .catch(() => {
-      console.log(`contract already verified`);
+    .catch((e) => {
+      console.log(`contract verify failed ${e}`);
     });
 }
 

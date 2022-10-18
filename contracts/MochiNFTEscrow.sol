@@ -33,8 +33,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
-import "hardhat/console.sol";
-
 contract MochiNFTEscrow is IERC721Receiver, Pausable, Ownable, ReentrancyGuard {
     struct TradeItem {
         uint256 tradeId;
@@ -300,6 +298,20 @@ contract MochiNFTEscrow is IERC721Receiver, Pausable, Ownable, ReentrancyGuard {
             items[i] = tradeItem;
         }
         return items;
+    }
+
+    function tradesOf(address user) public view returns (TradeOffer[] memory) {
+        uint256[] memory userTradeIds = userTrades[user];
+        TradeOffer[] memory userOffers = new TradeOffer[](userTradeIds.length);
+        for (uint256 i = 0; i < userTradeIds.length; i++) {
+            TradeOffer memory trade = trades[userTradeIds[i]];
+            userOffers[i] = trade;
+        }
+        return userOffers;
+    }
+
+    function tradeIds(address user) public view returns (uint256[] memory) {
+        return userTrades[user];
     }
 
     function onERC721Received(
