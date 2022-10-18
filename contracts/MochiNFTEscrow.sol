@@ -47,6 +47,8 @@ contract MochiNFTEscrow is IERC721Receiver, Pausable, Ownable, ReentrancyGuard {
         bool isFromLocked;
         bool isToLocked;
         bool isClosed;
+        bool isFromCancelled;
+        bool isToCancelled;
     }
 
     TradeOffer[] public trades;
@@ -98,7 +100,9 @@ contract MochiNFTEscrow is IERC721Receiver, Pausable, Ownable, ReentrancyGuard {
     }
 
     function createTradeOffer(address to) external notContract whenNotPaused {
-        trades.push(TradeOffer(msg.sender, to, false, false, false));
+        trades.push(
+            TradeOffer(msg.sender, to, false, false, false, false, false)
+        );
         uint256 tradeId = trades.length - 1;
         userTrades[msg.sender].push(tradeId);
         userTrades[to].push(tradeId);
@@ -115,6 +119,11 @@ contract MochiNFTEscrow is IERC721Receiver, Pausable, Ownable, ReentrancyGuard {
         TradeOffer storage trade = trades[tradeId];
         _withdrawAll(tradeId, trade.from);
         _withdrawAll(tradeId, trade.to);
+        if (msg.sender == trade.from) {
+            trade.isFromCancelled = true;
+        } else {
+            trade.isToCancelled = true;
+        }
         trade.isClosed = true;
         emit TradeCancelled(tradeId, msg.sender);
     }

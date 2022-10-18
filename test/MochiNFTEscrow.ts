@@ -191,6 +191,10 @@ describe("MochiNFTEscrow", function () {
         expect(await nft.ownerOf(otherTokenIds[0])).to.equal(
           otherAccount.address
         );
+        // Cancel trigger from from side
+        expect((await escrow.trades(tradeId)).isFromCancelled).be.true;
+        expect((await escrow.trades(tradeId)).isToCancelled).be.false;
+
         expect((await escrow.trades(tradeId)).isClosed).be.true;
       });
     });
