@@ -36,10 +36,10 @@ contract MochiNFTEscrowV2 is
         bool isClosed;
     }
 
-    // tradeIds => trade
+    // tradeId => trade
     mapping(string => TradeOffer) public trades;
-    mapping(string => RequiredItem[]) public fromItems;
-    mapping(string => RequiredItem[]) public toItems;
+    // tradeId => owner => requiredItems
+    mapping(string => mapping(address => RequiredItem[])) public requiredItems;
 
     // from/to address => tradeIds
     mapping(address => string[]) public userTrades;
@@ -98,37 +98,25 @@ contract MochiNFTEscrowV2 is
         trade.from = from;
         trade.to = to;
         for (uint i = 0; i < _fromItems.length; i++) {
-            fromItems[tradeId].push(_fromItems[i]);
+            requiredItems[tradeId][trade.from].push(_fromItems[i]);
         }
         for (uint i = 0; i < _toItems.length; i++) {
-            toItems[tradeId].push(_toItems[i]);
+            requiredItems[tradeId][trade.to].push(_toItems[i]);
         }
         userTrades[from].push(tradeId);
         userTrades[to].push(tradeId);
         emit TradeCreated(tradeId, from, to);
     }
 
-    function requiredFromItems(string calldata tradeId)
+    function requiredItemsOf(string calldata tradeId, address user)
         public
         view
         returns (RequiredItem[] memory)
     {
-        return fromItems[tradeId];
+        return requiredItems[tradeId][user];
     }
 
-    function requiredToItems(string calldata tradeId)
-        public
-        view
-        returns (RequiredItem[] memory)
-    {
-        return toItems[tradeId];
-    }
-
-    function deposit(
-        string calldata tradeId,
-        address tokenAddress,
-        uint256[] memory tokenIds
-    )
+    function depositAll(string calldata tradeId)
         public
         notContract
         whenNotPaused
@@ -138,47 +126,28 @@ contract MochiNFTEscrowV2 is
         uint256[] storage depositedItemIds = userDepositedItems[tradeId][
             msg.sender
         ];
-        for (uint256 i = 0; i < tokenIds.length; i++) {
-            IERC721(tokenAddress).safeTransferFrom(
+        RequiredItem[] memory userRequiredItems = requiredItems[tradeId][
+            msg.sender
+        ];
+        for (uint256 i = 0; i < userRequiredItems.length; i++) {
+            RequiredItem memory item = userRequiredItems[i];
+            IERC721(item.tokenAddress).safeTransferFrom(
                 msg.sender,
                 address(this),
-                tokenIds[i]
+                item.tokenId
             );
-            TradeItem memory item = TradeItem(tokenAddress, tokenIds[i], true);
-            depositedItems.push(item);
+            TradeItem memory tradeItem = TradeItem(
+                item.tokenAddress,
+                item.tokenId,
+                true
+            );
+            depositedItems.push(tradeItem);
             depositedItemIds.push(depositedItems.length - 1);
         }
         emit Deposit(tradeId, msg.sender);
-    }
-
-    function withdraw(
-        string calldata tradeId,
-        address tokenAddress,
-        uint256[] memory tokenIds
-    )
-        public
-        notContract
-        whenNotPaused
-        whenTradeOpen(tradeId)
-        onlyRelevant(tradeId)
-        nonReentrant
-    {
-        uint256[] memory userDepositedItemIds = userDepositedItems[tradeId][
-            msg.sender
-        ];
-        for (uint256 i = 0; i < userDepositedItemIds.length; i++) {
-            TradeItem storage item = depositedItems[userDepositedItemIds[i]];
-            if (!item.exists) continue;
-            if (item.tokenAddress != tokenAddress) continue;
-            if (!_contain(tokenIds, item.tokenId)) continue;
-            IERC721(item.tokenAddress).safeTransferFrom(
-                address(this),
-                msg.sender,
-                item.tokenId
-            );
-            item.exists = false;
+        if (swapable(tradeId)) {
+            swap(tradeId);
         }
-        emit Withdraw(tradeId, msg.sender);
     }
 
     function withdrawAll(string calldata tradeId)
@@ -223,7 +192,9 @@ contract MochiNFTEscrowV2 is
 
     function swapable(string calldata tradeId) public view returns (bool) {
         TradeOffer memory trade = trades[tradeId];
-        RequiredItem[] memory fromRequiredItems = fromItems[tradeId];
+        RequiredItem[] memory fromRequiredItems = requiredItems[tradeId][
+            trade.from
+        ];
         uint256[] memory fromDepositedItemIds = userDepositedItems[tradeId][
             trade.from
         ];
@@ -231,7 +202,9 @@ contract MochiNFTEscrowV2 is
             fromRequiredItems,
             fromDepositedItemIds
         );
-        RequiredItem[] memory toRequiredItems = toItems[tradeId];
+        RequiredItem[] memory toRequiredItems = requiredItems[tradeId][
+            trade.to
+        ];
         uint256[] memory toDepositedItemIds = userDepositedItems[tradeId][
             trade.to
         ];
@@ -240,28 +213,6 @@ contract MochiNFTEscrowV2 is
             toDepositedItemIds
         );
         return fromDepositedValid && toDepositedValid;
-    }
-
-    function _validDeposit(
-        RequiredItem[] memory requiredItems,
-        uint256[] memory depositedItemIds
-    ) internal view returns (bool) {
-        if (depositedItemIds.length != requiredItems.length) {
-            return false;
-        }
-        for (uint256 i = 0; i < depositedItemIds.length; i++) {
-            TradeItem memory depositedItem = depositedItems[
-                depositedItemIds[i]
-            ];
-            RequiredItem memory requiredItem = requiredItems[i];
-            if (
-                depositedItem.tokenAddress != requiredItem.tokenAddress ||
-                depositedItem.tokenId != requiredItem.tokenId
-            ) {
-                return false;
-            }
-        }
-        return true;
     }
 
     function cancelTradeOffer(string calldata tradeId)
@@ -357,5 +308,27 @@ contract MochiNFTEscrowV2 is
             item.exists = false;
         }
         emit Withdraw(tradeId, to);
+    }
+
+    function _validDeposit(
+        RequiredItem[] memory _requiredItems,
+        uint256[] memory depositedItemIds
+    ) internal view returns (bool) {
+        if (depositedItemIds.length != _requiredItems.length) {
+            return false;
+        }
+        for (uint256 i = 0; i < depositedItemIds.length; i++) {
+            TradeItem memory depositedItem = depositedItems[
+                depositedItemIds[i]
+            ];
+            RequiredItem memory requiredItem = _requiredItems[i];
+            if (
+                depositedItem.tokenAddress != requiredItem.tokenAddress ||
+                depositedItem.tokenId != requiredItem.tokenId
+            ) {
+                return false;
+            }
+        }
+        return true;
     }
 }

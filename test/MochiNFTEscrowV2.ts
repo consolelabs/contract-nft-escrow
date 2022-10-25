@@ -74,8 +74,14 @@ describe("MochiNFTEscrowV2", function () {
         toItems
       );
       const offer = await escrow.trades(tradeId);
-      const requiredFromItems = await escrow.requiredFromItems(tradeId);
-      const requiredToItems = await escrow.requiredToItems(tradeId);
+      const requiredFromItems = await escrow.requiredItemsOf(
+        tradeId,
+        owner.address
+      );
+      const requiredToItems = await escrow.requiredItemsOf(
+        tradeId,
+        addr1.address
+      );
       const expectedOffer = {
         from: owner.address,
         to: addr1.address,
@@ -224,8 +230,8 @@ describe("MochiNFTEscrowV2", function () {
     });
   });
 
-  describe("Swap", function () {
-    it("should swap item when user deposit is valid", async function () {
+  describe("DepositAll", function () {
+    it("should deposit all required items", async function () {
       const { escrow, owner, addr1, nft, ownerTokenIds, addr1TokenIds } =
         await loadFixture(deployEscrowFixtureWithNFT);
 
@@ -252,24 +258,13 @@ describe("MochiNFTEscrowV2", function () {
       for (const tokenId of ownerTokenIds) {
         await nft.approve(escrow.address, tokenId);
       }
-      await escrow.deposit(tradeId, nft.address, ownerTokenIds);
-      for (const tokenId of addr1TokenIds) {
-        await nft.connect(addr1).approve(escrow.address, tokenId);
-      }
-      await escrow.connect(addr1).deposit(tradeId, nft.address, addr1TokenIds);
-      await escrow.swap(tradeId);
-      for (const tokenId of addr1TokenIds) {
-        expect(await nft.ownerOf(tokenId)).to.equal(owner.address);
-      }
-
+      await escrow.depositAll(tradeId);
       for (const tokenId of ownerTokenIds) {
-        expect(await nft.ownerOf(tokenId)).to.equal(addr1.address);
+        expect(await nft.ownerOf(tokenId)).to.equal(escrow.address);
       }
-
-      expect((await escrow.trades(tradeId)).isClosed).be.true;
     });
 
-    it("should fail when user deposit is invalid", async function () {
+    it("should swap when 2 parties deposited", async function () {
       const { escrow, owner, addr1, nft, ownerTokenIds, addr1TokenIds } =
         await loadFixture(deployEscrowFixtureWithNFT);
 
@@ -296,65 +291,17 @@ describe("MochiNFTEscrowV2", function () {
       for (const tokenId of ownerTokenIds) {
         await nft.approve(escrow.address, tokenId);
       }
-      await escrow.deposit(tradeId, nft.address, ownerTokenIds);
+      await escrow.depositAll(tradeId);
       for (const tokenId of addr1TokenIds) {
         await nft.connect(addr1).approve(escrow.address, tokenId);
       }
-      await escrow.connect(addr1).deposit(tradeId, nft.address, addr1TokenIds);
-      await expect(escrow.swap(tradeId)).to.revertedWith(
-        "invalid deposited items"
-      );
-    });
-  });
-
-  describe("Withdraw", function () {
-    it("should withdraw item back to owner", async function () {
-      const { escrow, owner, addr1, nft, ownerTokenIds, addr1TokenIds } =
-        await loadFixture(deployEscrowFixtureWithNFT);
-
-      const tradeId = "33cd0862-eb15-446a-ada2-e5cfaf88b42e";
-      const fromItems: MochiNFTEscrowV2.RequiredItemStruct[] =
-        ownerTokenIds.map((id) => ({
-          tokenAddress: nft.address,
-          tokenId: id,
-        }));
-
-      const toItems: MochiNFTEscrowV2.RequiredItemStruct[] = addr1TokenIds.map(
-        (id) => ({
-          tokenAddress: nft.address,
-          tokenId: id,
-        })
-      );
-      await escrow.createTradeOffer(
-        tradeId,
-        owner.address,
-        addr1.address,
-        fromItems,
-        toItems
-      );
-
-      for (const tokenId of ownerTokenIds) {
-        await nft.approve(escrow.address, tokenId);
-      }
-      await escrow.deposit(tradeId, nft.address, ownerTokenIds);
-      for (const tokenId of addr1TokenIds) {
-        await nft.connect(addr1).approve(escrow.address, tokenId);
-      }
-      await escrow.connect(addr1).deposit(tradeId, nft.address, addr1TokenIds);
-
-      await escrow.withdraw(tradeId, nft.address, ownerTokenIds);
-      await escrow.connect(addr1).withdraw(tradeId, nft.address, addr1TokenIds);
-      for (const tokenId of ownerTokenIds) {
-        expect(await nft.ownerOf(tokenId)).to.equal(owner.address);
-      }
-      for (const tokenId of addr1TokenIds) {
-        expect(await nft.ownerOf(tokenId)).to.equal(addr1.address);
-      }
+      await escrow.connect(addr1).depositAll(tradeId);
+      expect((await escrow.trades(tradeId)).isClosed).be.true;
     });
   });
 
   describe("Cancel Trade Offer", function () {
-    describe("When both deposited and one side cancel trade", function () {
+    describe("When one deposited all and one side cancel trade", function () {
       it("Should return items back to owner", async function () {
         const { escrow, owner, addr1, nft, ownerTokenIds, addr1TokenIds } =
           await loadFixture(deployEscrowFixtureWithNFT);
@@ -381,26 +328,15 @@ describe("MochiNFTEscrowV2", function () {
         for (const tokenId of ownerTokenIds) {
           await nft.approve(escrow.address, tokenId);
         }
-        await escrow.deposit(tradeId, nft.address, ownerTokenIds);
+        await escrow.depositAll(tradeId);
 
-        for (const tokenId of addr1TokenIds) {
-          await nft.connect(addr1).approve(escrow.address, tokenId);
-        }
-        await escrow
-          .connect(addr1)
-          .deposit(tradeId, nft.address, addr1TokenIds);
-
-        await escrow.cancelTradeOffer(tradeId);
+        await escrow.connect(addr1).cancelTradeOffer(tradeId);
         for (const tokenId of ownerTokenIds) {
           expect(await nft.ownerOf(tokenId)).to.equal(owner.address);
         }
-        for (const tokenId of addr1TokenIds) {
-          expect(await nft.ownerOf(tokenId)).to.equal(addr1.address);
-        }
         // Cancel trigger from from side
-        expect((await escrow.trades(tradeId)).isFromCancelled).be.true;
-        expect((await escrow.trades(tradeId)).isToCancelled).be.false;
-
+        expect((await escrow.trades(tradeId)).isFromCancelled).be.false;
+        expect((await escrow.trades(tradeId)).isToCancelled).be.true;
         expect((await escrow.trades(tradeId)).isClosed).be.true;
       });
     });
