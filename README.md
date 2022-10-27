@@ -9,8 +9,8 @@
 
 ### MochiNFTEscrowV2
 
-- Goerli: [0x4058F40703D696AAD852e9e82F2e3fe45a4f6e36](https://goerli.etherscan.io/address/0x4058F40703D696AAD852e9e82F2e3fe45a4f6e36)
-- FTM: [0xb7B190A3E3C0F8dDeee468445Cff5020F5B8e8b0](https://ftmscan.com/address/0xb7B190A3E3C0F8dDeee468445Cff5020F5B8e8b0)
+- Goerli: [0x7097DCC77265150aA83A31588AfFB8a99c0f8BaC](https://goerli.etherscan.io/address/0x7097DCC77265150aA83A31588AfFB8a99c0f8BaC)
+- FTM: [0xEB02327e2a085C66e618c3A95D9Dd085EE44D83f](https://ftmscan.com/address/0xEB02327e2a085C66e618c3A95D9Dd085EE44D83f)
 
 ## How to run project
 
