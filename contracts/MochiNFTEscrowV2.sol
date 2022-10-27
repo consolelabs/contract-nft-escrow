@@ -28,8 +28,12 @@ contract MochiNFTEscrowV2 is
 
     struct TradeOffer {
         address owner;
-        bool isCancelled;
+        address recipient;
+        bool isOwnerCancelled;
+        bool isRecipientCancelled;
         bool isClosed;
+        bool isOwnerDeposited;
+        bool isRecipientDeposited;
         uint swapBlockNumber;
     }
 
@@ -46,7 +50,7 @@ contract MochiNFTEscrowV2 is
     TradeItem[] public depositedItems;
 
     event TradeCreated(string indexed tradeId, address indexed owner);
-    event TradeCancelled(string indexed tradeId);
+    event TradeCancelled(string indexed tradeId, address indexed cancelledUser);
     event TradeSuccess(
         string indexed tradeId,
         address indexed from,
@@ -133,11 +137,19 @@ contract MochiNFTEscrowV2 is
         whenTradeOpen(tradeId)
     {
         TradeOffer storage trade = trades[tradeId];
-        require(msg.sender == trade.owner, "only owner");
+        require(
+            msg.sender == trade.owner || msg.sender == trade.recipient,
+            "only owner or recipient"
+        );
         _withdrawAll(tradeId, trade.owner);
-        trade.isCancelled = true;
+        _withdrawAll(tradeId, trade.recipient);
+        if (msg.sender == trade.owner) {
+            trade.isOwnerCancelled = true;
+        } else {
+            trade.isRecipientCancelled = true;
+        }
         trade.isClosed = true;
-        emit TradeCancelled(tradeId);
+        emit TradeCancelled(tradeId, msg.sender);
     }
 
     function _createTradeOffer(
@@ -147,7 +159,6 @@ contract MochiNFTEscrowV2 is
         RequiredItem[] calldata _wantItems
     ) internal whenNotPaused {
         require(trades[tradeId].owner == address(0), "trade id already exists");
-        require(msg.sender == owner, "only owner");
         TradeOffer storage trade = trades[tradeId];
         trade.owner = owner;
         for (uint i = 0; i < _haveItems.length; i++) {
@@ -164,7 +175,7 @@ contract MochiNFTEscrowV2 is
         internal
         whenTradeOpen(tradeId)
     {
-        TradeOffer memory trade = trades[tradeId];
+        TradeOffer storage trade = trades[tradeId];
         uint256[] storage depositedItemIds = userDepositedItems[tradeId][
             msg.sender
         ];
@@ -187,32 +198,38 @@ contract MochiNFTEscrowV2 is
             depositedItems.push(tradeItem);
             depositedItemIds.push(depositedItems.length - 1);
         }
-        emit Deposit(tradeId, msg.sender);
-        // Owner will deposit first
-        // Then the other side call deposit and then trigger swapping items
         if (!isOwner) {
+            trade.recipient = msg.sender;
+            userTrades[msg.sender].push(tradeId);
+            trade.isRecipientDeposited = true;
+        } else {
+            trade.isOwnerDeposited = true;
+        }
+        emit Deposit(tradeId, msg.sender);
+        // Start swapping when both deposited
+        if (trade.isRecipientDeposited && trade.isOwnerDeposited) {
             _swap(tradeId);
         }
     }
 
     function _swap(string calldata tradeId) internal {
         TradeOffer storage trade = trades[tradeId];
-        // Send 'have' items to B address
+        // Send 'have' items to recipient address
         uint256[] memory haveItemIds = userDepositedItems[tradeId][trade.owner];
         for (uint256 i = 0; i < haveItemIds.length; i++) {
             TradeItem memory item = depositedItems[haveItemIds[i]];
-            IERC721(item.tokenAddress).approve(msg.sender, item.tokenId);
             IERC721(item.tokenAddress).safeTransferFrom(
                 address(this),
-                msg.sender,
+                trade.recipient,
                 item.tokenId
             );
         }
-        // Send 'want' items to trade owner address
-        uint256[] memory wantItemIds = userDepositedItems[tradeId][msg.sender];
+        // Send 'want' items to owner address
+        uint256[] memory wantItemIds = userDepositedItems[tradeId][
+            trade.recipient
+        ];
         for (uint256 i = 0; i < wantItemIds.length; i++) {
             TradeItem memory item = depositedItems[wantItemIds[i]];
-            IERC721(item.tokenAddress).approve(msg.sender, item.tokenId);
             IERC721(item.tokenAddress).safeTransferFrom(
                 address(this),
                 trade.owner,
@@ -221,7 +238,7 @@ contract MochiNFTEscrowV2 is
         }
         trade.swapBlockNumber = block.number;
         trade.isClosed = true;
-        emit TradeSuccess(tradeId, trade.owner, msg.sender);
+        emit TradeSuccess(tradeId, trade.owner, trade.recipient);
     }
 
     function _withdrawAll(string calldata tradeId, address to) internal {
